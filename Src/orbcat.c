@@ -37,12 +37,17 @@
 #include <unistd.h>
 #include <fcntl.h>
 #include <ctype.h>
-#include <sys/socket.h>
 #include <sys/types.h>
-#include <sys/ioctl.h>
 #include <sys/stat.h>
 #include <stdio.h>
 #include <string.h>
+#if defined(_WIN32) || defined(__CYGWIN__)
+#   include <winsock2.h>
+#   include <windows.h>
+#   include <ws2tcpip.h>
+#else
+#   include <sys/socket.h>
+#   include <netdb.h>
 #if defined(__APPLE__) && defined(__MACH__)
     #include <libusb.h>
 #else
@@ -52,14 +57,11 @@
         #error "Unknown OS"
     #endif
 #endif
+#endif
 #include <stdint.h>
 #include <inttypes.h>
 #include <limits.h>
-#include <termios.h>
 #include <pthread.h>
-#include <sys/socket.h>
-#include <netinet/in.h>
-#include <netdb.h>
 
 #include "git_version_info.h"
 #include "generics.h"
@@ -443,7 +445,7 @@ int _processOptions( int argc, char *argv[] )
 {
     int c;
     char *chanConfig;
-    uint chan;
+    unsigned int chan;
     char *chanIndex;
 #define DELIMITER ','
 
@@ -600,7 +602,7 @@ int main( int argc, char *argv[] )
     ITMDecoderInit( &_r.i, options.forceITMSync );
 
     sockfd = socket( AF_INET, SOCK_STREAM, 0 );
-    setsockopt( sockfd, SOL_SOCKET, SO_REUSEPORT, &flag, sizeof( flag ) );
+    setsockopt( sockfd, SOL_SOCKET, SO_REUSEADDR, (void*)&flag, sizeof( flag ) );
 
     if ( sockfd < 0 )
     {
@@ -609,7 +611,7 @@ int main( int argc, char *argv[] )
     }
 
     /* Now open the network connection */
-    bzero( ( char * ) &serv_addr, sizeof( serv_addr ) );
+    memset( ( char * ) &serv_addr, 0, sizeof( serv_addr ) );
     server = gethostbyname( options.server );
 
     if ( !server )
@@ -619,7 +621,7 @@ int main( int argc, char *argv[] )
     }
 
     serv_addr.sin_family = AF_INET;
-    bcopy( ( char * )server->h_addr,
+    memcpy( ( char * )server->h_addr,
            ( char * )&serv_addr.sin_addr.s_addr,
            server->h_length );
     serv_addr.sin_port = htons( options.port );
