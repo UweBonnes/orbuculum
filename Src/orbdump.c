@@ -35,13 +35,17 @@
 #include <unistd.h>
 #include <fcntl.h>
 #include <ctype.h>
-#include <sys/socket.h>
 #include <sys/types.h>
-#include <sys/ioctl.h>
 #include <sys/stat.h>
 #include <stdio.h>
 #include <string.h>
-#include <elf.h>
+#if defined(_WIN32) || defined(__CYGWIN__)
+#   include <winsock2.h>
+#   include <windows.h>
+#   include <ws2tcpip.h>
+#else
+#   include <sys/socket.h>
+#   include <netdb.h>
 #if defined(__APPLE__) && defined(__MACH__)
     #include <libusb.h>
 #else
@@ -51,13 +55,10 @@
         #error "Unknown OS"
     #endif
 #endif
+#endif
 #include <stdint.h>
 #include <limits.h>
-#include <termios.h>
 #include <pthread.h>
-#include <sys/socket.h>
-#include <netinet/in.h>
-#include <netdb.h>
 #include "generics.h"
 #include "uthash.h"
 #include "git_version_info.h"
@@ -124,10 +125,22 @@ struct
 uint64_t _timestamp( void )
 
 {
+#if defined(_WIN32) || defined(__CYGWIN__)
+    FILETIME ft;
+    SYSTEMTIME st;
+
+    GetLocalTime(&st);
+    SystemTimeToFileTime(&st, &ft);
+    uint64_t res = ((uint64_t)ft.dwHighDateTime << 32) | ft.dwLowDateTime;
+    /* we return Nanoseconds since January 1, 1601 (UTC).*/
+    /* Fixme: Should we return milliseconds and remove offset 1970 and 1601?*/
+    return res;
+#else
     struct timeval te;
     gettimeofday( &te, NULL ); // get current time
     uint64_t milliseconds = te.tv_sec * 1000LL + te.tv_usec / 1000; // caculate milliseconds
     return milliseconds;
+#endif
 }
 // ====================================================================================================
 // ====================================================================================================
@@ -336,7 +349,7 @@ int main( int argc, char *argv[] )
     ITMDecoderInit( &_r.i, options.forceITMSync );
 
     sockfd = socket( AF_INET, SOCK_STREAM, 0 );
-    setsockopt( sockfd, SOL_SOCKET, SO_REUSEPORT, &flag, sizeof( flag ) );
+    setsockopt( sockfd, SOL_SOCKET, SO_REUSEADDR, (void*)&flag, sizeof( flag ) );
 
     if ( sockfd < 0 )
     {
@@ -346,7 +359,7 @@ int main( int argc, char *argv[] )
 
 
     /* Now open the network connection */
-    bzero( ( char * ) &serv_addr, sizeof( serv_addr ) );
+    memset( ( char * ) &serv_addr, 0, sizeof( serv_addr ) );
     server = gethostbyname( options.server );
 
     if ( !server )
@@ -356,7 +369,7 @@ int main( int argc, char *argv[] )
     }
 
     serv_addr.sin_family = AF_INET;
-    bcopy( ( char * )server->h_addr,
+    memcpy( ( char * )server->h_addr,
            ( char * )&serv_addr.sin_addr.s_addr,
            server->h_length );
     serv_addr.sin_port = htons( options.port );
@@ -424,11 +437,12 @@ int main( int argc, char *argv[] )
         {
             genericsReport( V_WARN, "Warning:Sync lost while writing output" EOL );
         }
-
+#if defined(sync)
         if ( options.writeSync )
         {
             sync();
         }
+#endif
     }
 
     close( sockfd );
