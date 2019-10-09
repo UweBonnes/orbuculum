@@ -1,6 +1,6 @@
 #VERBOSE=1
 DEBUG=1
-WITH_FPGA?=1
+WITH_FPGA?=0
 
 CFLAGS=-DVERSION="\"1.00\"" -Werror
 
@@ -31,11 +31,11 @@ CFILES =
 SFILES =
 OLOC = ofiles
 INCLUDE_PATHS = -I/usr/local/include/libusb-1.0 -I/usr/include/libiberty
-LDLIBS = -L/usr/local/lib -lusb-1.0 -lelf -lbfd -lz -ldl -liberty
+LDLIBS = -L/usr/local/lib -lusb-1.0  -lbfd -lz -liberty
 
 ifeq ($(WITH_FPGA),1)
 CFLAGS+=-DINCLUDE_FPGA_SUPPORT
-LDLIBS += -lftdi1
+LDLIBS += -lftdi1 -lelf
 FPGA_CFILES=$(App_DIR)/ftdispi.c
 endif
 
@@ -83,7 +83,9 @@ GET_GIT_HASH = Tools/git_hash_to_c/git_hash_to_c.sh
 
 SYS := $(shell $(CC) -dumpmachine)
 ifneq (, $(findstring linux, $(SYS)))
-LDLIBS += -lpthread
+LDLIBS += -lpthread  -ldl
+else ifneq (, $(findstring mingw, $(SYS)))
+LDLIBS += -lws2_32
 endif
 
 ##########################################################################
@@ -158,7 +160,8 @@ $(OLOC)/%.o : %.c
 	$(call cmd, \$(CC) -c $(CFLAGS) -MMD -o $@ $< ,\
 	Compiling $<)
 
-build: $(ORBUCULUM) $(ORBCAT) $(ORBTOP) $(ORBDUMP) $(ORBSTAT)
+#build: $(ORBCAT) $(ORBTOP) $(ORBDUMP) $(ORBSTAT)
+build: $(ORBCAT) $(ORBTOP) $(ORBDUMP) $(ORBSTAT) $(ORBUCULUM)
 
 $(ORBUCULUM) : get_version $(ORBUCULUM_POBJS) $(SYS_OBJS)
 	$(Q)$(CC) $(LDFLAGS) -o $(OLOC)/$(ORBUCULUM) $(MAP) $(ORBUCULUM_POBJS) $(LDLIBS)
