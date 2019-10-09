@@ -36,18 +36,17 @@
 #include <fcntl.h>
 #include <stdbool.h>
 #include <ctype.h>
-#include <sys/socket.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <stdio.h>
 #include <string.h>
 #include <semaphore.h>
-#if defined OSX
+#if defined(__APPLE__) && defined(__MACH__)
     #include <sys/ioctl.h>
     #include <libusb.h>
     #include <termios.h>
 #else
-    #if defined LINUX
+    #if defined(__linux__)
         #include <libusb-1.0/libusb.h>
         #include <asm/ioctls.h>
         #if defined TCGETS2
@@ -68,7 +67,6 @@
 #include <pthread.h>
 #include <sys/socket.h>
 #include <netdb.h>
-#include <netinet/in.h>
 #include <arpa/inet.h>
 #include <signal.h>
 
@@ -1394,7 +1392,7 @@ int seggerFeeder( void )
     return -2;
 }
 // ====================================================================================================
-#if defined(LINUX) && defined (TCGETS2)
+#if defined(__linux__) && defined (TCGETS2)
 int setSerialConfig ( int f, speed_t speed )
 {
     // Use Linux specific termios2.
@@ -1540,7 +1538,7 @@ int serialFeeder( void )
 
     while ( 1 )
     {
-#ifdef OSX
+#if defined(__APPLE__) && defined(__MACH__)
 
         while ( ( f = open( options.port, O_RDONLY | O_NONBLOCK ) ) < 0 )
 #else
@@ -1553,7 +1551,7 @@ int serialFeeder( void )
 
         genericsReport( V_INFO, "Port opened" EOL );
 
-#ifdef OSX
+#if defined(__APPLE__) && defined(__MACH__)
         /* Remove the O_NONBLOCK flag now the port is open (OSX Only) */
 
         if ( ( flags = fcntl( f, F_GETFL, NULL ) ) < 0 )

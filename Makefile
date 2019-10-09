@@ -2,7 +2,7 @@
 DEBUG=1
 WITH_FPGA?=1
 
-CFLAGS=-DVERSION="\"1.00\""
+CFLAGS=-DVERSION="\"1.00\"" -Werror
 
 CROSS_COMPILE=
 # Output Files
@@ -11,20 +11,6 @@ ORBCAT = orbcat
 ORBTOP = orbtop
 ORBDUMP = orbdump
 ORBSTAT = orbstat
-
-##########################################################################
-# Check Host OS
-##########################################################################
-
-UNAME_S := $(shell uname -s)
-ifeq ($(UNAME_S),Linux)
-  CFLAGS += -DLINUX
-  LINUX=1
-endif
-ifeq ($(UNAME_S),Darwin)
-  CFLAGS += -DOSX
-  OSX=1
-endif
 
 ##########################################################################
 # User configuration and firmware specific object files	
@@ -46,10 +32,6 @@ SFILES =
 OLOC = ofiles
 INCLUDE_PATHS = -I/usr/local/include/libusb-1.0 -I/usr/include/libiberty
 LDLIBS = -L/usr/local/lib -lusb-1.0 -lelf -lbfd -lz -ldl -liberty
-
-#ifdef LINUX
-LDLIBS += -lpthread
-#endif
 
 ifeq ($(WITH_FPGA),1)
 CFLAGS+=-DINCLUDE_FPGA_SUPPORT
@@ -83,14 +65,26 @@ ORBSTAT_CFILES = $(App_DIR)/$(ORBSTAT).c $(App_DIR)/symbols.c
 ##########################################################################
 
 ASTYLE = astyle
+ifneq ($(strip $(CROSS_COMPILE)),)
 AS = $(CROSS_COMPILE)gcc
 CC = $(CROSS_COMPILE)gcc
 LD = $(CROSS_COMPILE)gcc
 GDB = $(CROSS_COMPILE)gdb
 OBJCOPY = $(CROSS_COMPILE)objcopy
 OBJDUMP = $(CROSS_COMPILE)objdump
+else
+LD = $(CC)
+endif
 GET_GIT_HASH = Tools/git_hash_to_c/git_hash_to_c.sh
-MAKE = make
+
+##########################################################################
+# Check Host OS
+##########################################################################
+
+SYS := $(shell $(CC) -dumpmachine)
+ifneq (, $(findstring linux, $(SYS)))
+LDLIBS += -lpthread
+endif
 
 ##########################################################################
 # Quietening
@@ -116,6 +110,7 @@ CFLAGS +=  $(ARCH_FLAGS) $(STARTUP_DEFS) $(OPT_LEVEL) $(DEBUG_OPTS) \
 		-ffunction-sections -fdata-sections -Wall -Wno-unused-result $(INCLUDE_PATHS)  $(GCC_DEFINE)
 ASFLAGS += -c $(DEBUG_OPTS) $(INCLUDE_PATHS) $(ARCH_FLAGS) $(GCC_DEFINE) \
           -x assembler-with-cpp
+
 LDFLAGS += $(CFLAGS)
 
 OCFLAGS += --strip-unneeded
@@ -166,7 +161,7 @@ $(OLOC)/%.o : %.c
 build: $(ORBUCULUM) $(ORBCAT) $(ORBTOP) $(ORBDUMP) $(ORBSTAT)
 
 $(ORBUCULUM) : get_version $(ORBUCULUM_POBJS) $(SYS_OBJS)
-	$(Q)$(LD) $(LDFLAGS) -o $(OLOC)/$(ORBUCULUM) $(MAP) $(ORBUCULUM_POBJS) $(LDLIBS)
+	$(Q)$(CC) $(LDFLAGS) -o $(OLOC)/$(ORBUCULUM) $(MAP) $(ORBUCULUM_POBJS) $(LDLIBS)
 	-@echo "Completed build of" $(ORBUCULUM)
 
 $(ORBCAT) : get_version $(ORBCAT_POBJS) $(SYS_OBJS)

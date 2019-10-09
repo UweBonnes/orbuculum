@@ -46,10 +46,10 @@
 #include <elf.h>
 #include <demangle.h>
 #include "bfd_wrapper.h"
-#if defined OSX
+#if defined(__APPLE__) && defined(__MACH__)
     #include <libusb.h>
 #else
-    #if defined LINUX
+    #if defined(__linux__)
         #include <libusb-1.0/libusb.h>
     #else
         #error "Unknown OS"
