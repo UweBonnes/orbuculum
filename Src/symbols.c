@@ -38,12 +38,10 @@
 #include <fcntl.h>
 #include <ctype.h>
 #include <sys/types.h>
-#include <sys/ioctl.h>
 #include <sys/stat.h>
 #include <stdio.h>
 #include <string.h>
 #include <stdarg.h>
-#include <elf.h>
 #include <stdint.h>
 #include <assert.h>
 #include "generics.h"
@@ -215,8 +213,8 @@ bool SymbolSetCheckValidity( struct SymbolSet **s, char *filename )
     /* We check filesize, modification time and status change time for any differences */
     if ( ( !( *s ) ) ||
             ( memcmp( &n.st_size, &( ( *s )->st.st_size ), sizeof( off_t ) ) ) ||
-            ( memcmp( &n.st_mtim, &( ( *s )->st.st_mtim ), sizeof( struct timespec ) ) ) ||
-            ( memcmp( &n.st_ctim, &( ( *s )->st.st_ctim ), sizeof( struct timespec ) ) )
+            ( memcmp( &n.st_mtime, &( ( *s )->st.st_mtime ), sizeof( struct timespec ) ) ) ||
+            ( memcmp( &n.st_ctime, &( ( *s )->st.st_ctime ), sizeof( struct timespec ) ) )
        )
     {
         /* There was either no file, or a difference, re-create the symbol set */
