@@ -41,6 +41,15 @@
 #include <stdio.h>
 #include <string.h>
 #include <semaphore.h>
+#if defined(_WIN32) || defined(__CYGWIN__)
+#   include <winsock2.h>
+#   include <windows.h>
+#   include <ws2tcpip.h>
+#   include <libusb-1.0/libusb.h>
+#else
+#   include <sys/socket.h>
+#   include <netdb.h>
+#   include <arpa/inet.h>
 #if defined(__APPLE__) && defined(__MACH__)
     #include <sys/ioctl.h>
     #include <libusb.h>
@@ -61,13 +70,11 @@
         #error "Unknown OS"
     #endif
 #endif
+#endif
 #include <stdint.h>
 #include <inttypes.h>
 #include <limits.h>
 #include <pthread.h>
-#include <sys/socket.h>
-#include <netdb.h>
-#include <arpa/inet.h>
 #include <signal.h>
 
 #include "git_version_info.h"
@@ -99,7 +106,7 @@
 /* Descriptor information for BMP */
 #define VID       (0x1d50)
 #define PID       (0x6018)
-#define INTERFACE (5)
+#define USB_INTERFACE (5)
 #define ENDPOINT  (0x85)
 
 #define TRANSFER_SIZE (4096)
@@ -403,13 +410,43 @@ static void _removeFifoTasks( void )
         }
     }
 }
+#if defined(_WIN32) || defined(__CYGWIN__)
+const char* inet_ntop(int af, const void* src, char* dst, int cnt)
+{
+
+    struct sockaddr_in srcaddr;
+
+    memset(&srcaddr, 0, sizeof(struct sockaddr_in));
+    memcpy(&(srcaddr.sin_addr), src, sizeof(srcaddr.sin_addr));
+
+    srcaddr.sin_family = af;
+    if (WSAAddressToString((struct sockaddr*) &srcaddr, sizeof(struct sockaddr_in), 0, dst, (LPDWORD) &cnt) != 0) {
+//        DWORD rv = WSAGetLastError();
+//        printf("WSAAddressToString() : %d\n",rv);
+        return NULL;
+    }
+    return dst;
+}
+#endif
 // ====================================================================================================
 uint64_t _timestampuS( void )
 
 {
+#if defined(_WIN32) || defined(__CYGWIN__)
+    FILETIME ft;
+    SYSTEMTIME st;
+
+    GetLocalTime(&st);
+    SystemTimeToFileTime(&st, &ft);
+    uint64_t res = ((uint64_t)ft.dwHighDateTime << 32) | ft.dwLowDateTime;
+    res /= 1000;
+   /* Fixme: Should we remove offset 1970 and 1601?*/
+    return res;
+#else
     struct timeval te;
     gettimeofday( &te, NULL ); // get current time
     return ( te.tv_sec * 1000000LL + te.tv_usec ); // caculate microseconds
+#endif
 }
 // ====================================================================================================
 // ====================================================================================================
@@ -531,7 +568,7 @@ static bool _makeServerTask( int port )
     int flag = 1;
 
     sockfd = socket( AF_INET, SOCK_STREAM, 0 );
-    setsockopt( sockfd, SOL_SOCKET, SO_REUSEPORT, &flag, sizeof( flag ) );
+    setsockopt( sockfd, SOL_SOCKET, SO_REUSEADDR, (void*)&flag, sizeof( flag ) );
 
     if ( sockfd < 0 )
     {
@@ -539,12 +576,12 @@ static bool _makeServerTask( int port )
         return false;
     }
 
-    bzero( ( char * ) &serv_addr, sizeof( serv_addr ) );
+    memset( ( char * ) &serv_addr, 0, sizeof( serv_addr ) );
     serv_addr.sin_family = AF_INET;
     serv_addr.sin_addr.s_addr = INADDR_ANY;
     serv_addr.sin_port = htons( port );
 
-    if ( setsockopt( sockfd, SOL_SOCKET, SO_REUSEADDR, &( int )
+    if ( setsockopt( sockfd, SOL_SOCKET, SO_REUSEADDR, (void*)&( int )
 {
     1
 }, sizeof( int ) ) < 0 )
@@ -606,12 +643,12 @@ void _handleException( struct ITMDecoder *i, struct ITMPacket *p )
     if ( exceptionNumber < 16 )
     {
         /* This is a system based exception */
-        opLen = snprintf( outputString, MAX_STRING_LENGTH, "%d,%ld,%s,%s" EOL, HWEVENT_EXCEPTION, eventdifftS, exEvent[eventType & 0x03], exNames[exceptionNumber & 0x0F] );
+        opLen = snprintf( outputString, MAX_STRING_LENGTH, "%d,%" PRId64 ",%s,%s" EOL, HWEVENT_EXCEPTION, eventdifftS, exEvent[eventType & 0x03], exNames[exceptionNumber & 0x0F] );
     }
     else
     {
         /* This is a CPU defined exception */
-        opLen = snprintf( outputString, MAX_STRING_LENGTH, "%d,%ld,%s,External,%d" EOL, HWEVENT_EXCEPTION, eventdifftS, exEvent[eventType & 0x03], exceptionNumber - 16 );
+        opLen = snprintf( outputString, MAX_STRING_LENGTH, "%d,%" PRId64 ",%s,External,%d" EOL, HWEVENT_EXCEPTION, eventdifftS, exEvent[eventType & 0x03], exceptionNumber - 16 );
     }
 
     write( _r.c[HW_CHANNEL].handle, outputString, opLen );
@@ -633,7 +670,7 @@ void _handleDWTEvent( struct ITMDecoder *i, struct ITMPacket *p )
     {
         if ( event & ( 1 << i ) )
         {
-            opLen = snprintf( outputString, MAX_STRING_LENGTH, "%d,%ld,%s" EOL, HWEVENT_DWT, eventdifftS, evName[event] );
+            opLen = snprintf( outputString, MAX_STRING_LENGTH, "%d,%" PRId64 ",%s" EOL, HWEVENT_DWT, eventdifftS, evName[event] );
             write( _r.c[HW_CHANNEL].handle, outputString, opLen );
         }
     }
@@ -654,12 +691,12 @@ void _handlePCSample( struct ITMDecoder *i, struct ITMPacket *p )
     if ( p->len == 1 )
     {
         /* This is a sleep packet */
-        opLen = snprintf( outputString, ( MAX_STRING_LENGTH - 1 ), "%d,%ld,**SLEEP**" EOL, HWEVENT_PCSample, eventdifftS );
+        opLen = snprintf( outputString, ( MAX_STRING_LENGTH - 1 ), "%d,%" PRId64 ",**SLEEP**" EOL, HWEVENT_PCSample, eventdifftS );
     }
     else
     {
         uint32_t pc = ( p->d[3] << 24 ) | ( p->d[2] << 16 ) | ( p->d[1] << 8 ) | ( p->d[0] );
-        opLen = snprintf( outputString, ( MAX_STRING_LENGTH - 1 ), "%d,%ld,0x%08x" EOL, HWEVENT_PCSample, eventdifftS, pc );
+        opLen = snprintf( outputString, ( MAX_STRING_LENGTH - 1 ), "%d,%" PRId64 ",0x%08x" EOL, HWEVENT_PCSample, eventdifftS, pc );
     }
 
     write( _r.c[HW_CHANNEL].handle, outputString, opLen );
@@ -695,7 +732,7 @@ void _handleDataRWWP( struct ITMDecoder *i, struct ITMPacket *p )
             break;
     }
 
-    opLen = snprintf( outputString, MAX_STRING_LENGTH, "%d,%ld,%d,%s,0x%x" EOL, HWEVENT_RWWT, eventdifftS, comp, isWrite ? "Write" : "Read", data );
+    opLen = snprintf( outputString, MAX_STRING_LENGTH, "%d,%" PRId64 ",%d,%s,0x%x" EOL, HWEVENT_RWWT, eventdifftS, comp, isWrite ? "Write" : "Read", data );
     write( _r.c[HW_CHANNEL].handle, outputString, opLen );
 }
 // ====================================================================================================
@@ -713,7 +750,7 @@ void _handleDataAccessWP( struct ITMDecoder *i, struct ITMPacket *p )
     uint64_t eventdifftS = ts - _r.lastHWExceptionTS;
 
     _r.lastHWExceptionTS = ts;
-    opLen = snprintf( outputString, MAX_STRING_LENGTH, "%d,%ld,%d,0x%08x" EOL, HWEVENT_AWP, eventdifftS, comp, data );
+    opLen = snprintf( outputString, MAX_STRING_LENGTH, "%d,%" PRId64 ",%d,0x%08x" EOL, HWEVENT_AWP, eventdifftS, comp, data );
     write( _r.c[HW_CHANNEL].handle, outputString, opLen );
 }
 // ====================================================================================================
@@ -730,7 +767,7 @@ void _handleDataOffsetWP( struct ITMDecoder *i, struct ITMPacket *p )
     uint64_t eventdifftS = ts - _r.lastHWExceptionTS;
 
     _r.lastHWExceptionTS = ts;
-    opLen = snprintf( outputString, MAX_STRING_LENGTH, "%d,%ld,%d,0x%04x" EOL, HWEVENT_OFS, eventdifftS, comp, offset );
+    opLen = snprintf( outputString, MAX_STRING_LENGTH, "%d,%" PRId64 ",%d,0x%04x" EOL, HWEVENT_OFS, eventdifftS, comp, offset );
     write( _r.c[HW_CHANNEL].handle, outputString, opLen );
 }
 // ====================================================================================================
@@ -985,12 +1022,23 @@ void _protocolPump( uint8_t c )
     }
 }
 // ====================================================================================================
+#ifdef _WIN32
+void handle_signal(int signal) {
+    switch (signal) {
+    case SIGTERM:
+    case SIGABRT:
+    case SIGBREAK:
+        exit(0);
+    }
+}
+#else
 static void _intHandler( int sig, siginfo_t *si, void *unused )
 
 {
     /* CTRL-C exit is not an error... */
     exit( 0 );
 }
+#endif
 // ====================================================================================================
 void _printHelp( char *progName )
 
@@ -1018,7 +1066,7 @@ int _processOptions( int argc, char *argv[] )
 {
     int c;
     char *chanConfig;
-    uint chan;
+    unsigned int chan;
     char *chanIndex;
 #define DELIMITER ','
 
@@ -1288,7 +1336,7 @@ int usbFeeder( void )
             continue;
         }
 
-        if ( ( err = libusb_claim_interface ( handle, INTERFACE ) ) < 0 )
+        if ( ( err = libusb_claim_interface ( handle, USB_INTERFACE ) ) < 0 )
         {
             genericsReport( V_ERROR, "Failed to claim interface (%d)" EOL, err );
             return 0;
@@ -1337,7 +1385,7 @@ int seggerFeeder( void )
     ssize_t t;
     int flag = 1;
 
-    bzero( ( char * ) &serv_addr, sizeof( serv_addr ) );
+    memset( ( char * ) &serv_addr, 0, sizeof( serv_addr ) );
     server = gethostbyname( options.seggerHost );
 
     if ( !server )
@@ -1347,7 +1395,7 @@ int seggerFeeder( void )
     }
 
     serv_addr.sin_family = AF_INET;
-    bcopy( ( char * )server->h_addr,
+    memcpy( ( char * )server->h_addr,
            ( char * )&serv_addr.sin_addr.s_addr,
            server->h_length );
     serv_addr.sin_port = htons( options.seggerPort );
@@ -1355,7 +1403,7 @@ int seggerFeeder( void )
     while ( 1 )
     {
         sockfd = socket( AF_INET, SOCK_STREAM, 0 );
-        setsockopt( sockfd, SOL_SOCKET, SO_REUSEPORT, &flag, sizeof( flag ) );
+        setsockopt( sockfd, SOL_SOCKET, SO_REUSEADDR, (void*)&flag, sizeof( flag ) );
 
         if ( sockfd < 0 )
         {
@@ -1392,7 +1440,8 @@ int seggerFeeder( void )
     return -2;
 }
 // ====================================================================================================
-#if defined(__linux__) && defined (TCGETS2)
+//#if defined(__linux__) && defined (TCGETS2)
+#if 1
 int setSerialConfig ( int f, speed_t speed )
 {
     // Use Linux specific termios2.
@@ -1757,9 +1806,6 @@ int fileFeeder( void )
 int main( int argc, char *argv[] )
 
 {
-    sigset_t set;
-    struct sigaction sa;
-
     if ( !_processOptions( argc, argv ) )
     {
         genericsExit( -1, "processOptions failed" EOL );
@@ -1774,6 +1820,14 @@ int main( int argc, char *argv[] )
     ITMDecoderInit( &_r.i, options.forceITMSync );
 
     /* This ensures the atexit gets called */
+#ifdef _WIN32
+    signal(SIGINT, handle_signal);
+    signal(SIGTERM, handle_signal);
+    signal(SIGABRT, handle_signal);
+#else
+    struct sigaction sa;
+    sigset_t set;
+
     sa.sa_flags = SA_SIGINFO;
     sigemptyset( &sa.sa_mask );
     sa.sa_sigaction = _intHandler;
@@ -1786,7 +1840,7 @@ int main( int argc, char *argv[] )
     /* Don't kill a sub-process when any reader or writer evaporates */
     sigemptyset( &set );
     sigaddset( &set, SIGPIPE );
-
+#endif
     if ( pthread_sigmask( SIG_BLOCK, &set, NULL ) == -1 )
     {
         genericsExit( -1, "Failed to establish Int handler" EOL );
