@@ -396,7 +396,7 @@ int main( int argc, char *argv[] )
     genericsReport( V_INFO, "Waiting for sync" EOL );
 
     /* Start the process of collecting the data */
-    while ( ( readLength = read( sockfd, cbw, TRANSFER_SIZE ) ) > 0 )
+    while ( ( readLength = recv( sockfd, (void*)cbw, TRANSFER_SIZE, 0 ) ) > 0 )
     {
         if ( ( options.timelen ) && ( ( firstTime != 0 ) && ( ( _timestamp() - firstTime ) > options.timelen ) ) )
         {

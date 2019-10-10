@@ -1070,7 +1070,7 @@ int main( int argc, char *argv[] )
         return -1;
     }
 
-    while ( ( t = read( sockfd, cbw, TRANSFER_SIZE ) ) > 0 )
+    while ( ( t = recv( sockfd, (void*)cbw, TRANSFER_SIZE, 0 ) ) > 0 )
     {
         uint8_t *c = cbw;
 

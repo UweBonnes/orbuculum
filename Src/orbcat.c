@@ -607,7 +607,6 @@ int main( int argc, char *argv[] )
 
     sockfd = socket( AF_INET, SOCK_STREAM, 0 );
     setsockopt( sockfd, SOL_SOCKET, SO_REUSEADDR, (void*)&flag, sizeof( flag ) );
-
     if ( sockfd < 0 )
     {
         genericsReport( V_ERROR, "Error creating socket" EOL );
@@ -636,7 +635,7 @@ int main( int argc, char *argv[] )
         return -1;
     }
 
-    while ( ( t = read( sockfd, cbw, TRANSFER_SIZE ) ) > 0 )
+    while ( ( t = recv( sockfd, (void*)cbw, TRANSFER_SIZE, 0 ) ) > 0 )
     {
         unsigned char *c = cbw;
 
