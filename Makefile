@@ -30,7 +30,7 @@ GCC_DEFINE+= -std=gnu99
 CFILES =
 SFILES =
 INCLUDE_PATHS = -I/usr/local/include/libusb-1.0 -I/usr/include/libiberty
-LDLIBS = -L/usr/local/lib -lusb-1.0  -lbfd -lz -liberty
+LDLIBS = -L/usr/local/lib -lusb-1.0  -lbfd -liberty
 
 ifeq ($(WITH_FPGA),1)
 CFLAGS+=-DINCLUDE_FPGA_SUPPORT
@@ -83,8 +83,12 @@ SYS := $(shell $(CC) -dumpmachine)
 ifneq (, $(findstring linux, $(SYS)))
 LDLIBS += -lpthread  -ldl
 else ifneq (, $(findstring mingw, $(SYS)))
+LIBZ_STATIC = 1
 OLOC = ofiles_mingw
-LDLIBS += -lws2_32
+LDLIBS += -lws2_32 -l:libz.a
+endif
+ifneq ($(LIBZ_STATIC),1)
+LDLIBS += -lz
 endif
 OLOC ?= ofiles
 
