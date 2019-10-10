@@ -35,15 +35,20 @@
 #include <unistd.h>
 #include <fcntl.h>
 #include <ctype.h>
-#include <sys/socket.h>
 #include <sys/types.h>
-#include <sys/ioctl.h>
 #include <sys/stat.h>
 #include <stdio.h>
 #include <string.h>
 #include <stdarg.h>
-#include <elf.h>
 #include "bfd_wrapper.h"
+#if defined(_WIN32) || defined(__CYGWIN__)
+#   include <winsock2.h>
+#   include <windows.h>
+#   include <ws2tcpip.h>
+#else
+#   include <sys/socket.h>
+#   include <netdb.h>
+#   include <sys/ioctl.h>
 #if defined(__APPLE__) && defined(__MACH__)
     #include <libusb.h>
 #else
@@ -53,13 +58,11 @@
         #error "Unknown OS"
     #endif
 #endif
+#endif
 #include <stdint.h>
+#include <inttypes.h>
 #include <limits.h>
-#include <termios.h>
 #include <pthread.h>
-#include <sys/socket.h>
-#include <netinet/in.h>
-#include <netdb.h>
 
 #include "git_version_info.h"
 #include "uthash.h"
@@ -292,15 +295,31 @@ void _flushHash( void )
     _r.name = NULL;
 }
 // ====================================================================================================
+// ====================================================================================================
+// ====================================================================================================
+// Internally available routines
+// ====================================================================================================
+// ====================================================================================================
+// ====================================================================================================
 uint64_t _timestamp( void )
 
-/* Return a timestamp */
-
 {
+#if defined(_WIN32) || defined(__CYGWIN__)
+    FILETIME ft;
+    SYSTEMTIME st;
+
+    GetLocalTime(&st);
+    SystemTimeToFileTime(&st, &ft);
+    uint64_t res = ((uint64_t)ft.dwHighDateTime << 32) | ft.dwLowDateTime;
+    /* we return Nanoseconds since January 1, 1601 (UTC).*/
+    /* Fixme: Should we return milliseconds and remove offset 1970 and 1601?*/
+    return res;
+#else
     struct timeval te;
     gettimeofday( &te, NULL ); // get current time
     uint64_t milliseconds = te.tv_sec * 1000LL + te.tv_usec / 1000; // caculate milliseconds
     return milliseconds;
+#endif
 }
 // ====================================================================================================
 int _addresses_sort_fn( const void *a, const void *b )
@@ -368,7 +387,7 @@ void _dumpProfile( void )
         if ( !t->seen )
         {
             /* Haven't seen it before, so announce it */
-            fprintf( _r.c, "fl=(%d) %s\nfn=(%d) %s\n0x%08x %d %ld\n", t->index, t->n->filename, t->index, t->n->function, t->n->addr, t->n->line, myCost );
+            fprintf( _r.c, "fl=(%d) %s\nfn=(%d) %s\n0x%08x %d %" PRId64 "\n", t->index, t->n->filename, t->index, t->n->function, t->n->addr, t->n->line, myCost );
             t->seen = true;
         }
     }
@@ -397,7 +416,7 @@ void _dumpProfile( void )
         if ( !t->seen )
         {
             /* This is a previously unseen dest, announce it */
-            fprintf( _r.c, "fl=(%d) %s\nfn=(%d) %s\n0x%08x %d %ld\n", t->index, t->n->filename, t->index, t->n->function, t->n->addr, t->n->line, myCost );
+            fprintf( _r.c, "fl=(%d) %s\nfn=(%d) %s\n0x%08x %d %" PRId64 "\n", t->index, t->n->filename, t->index, t->n->function, t->n->addr, t->n->line, myCost );
             t->seen = true;
         }
 
@@ -416,7 +435,7 @@ void _dumpProfile( void )
 
         /* Now publish the call destination. By definition is is known, so can be shortformed */
         fprintf( _r.c, "cfi=(%d)\ncfn=(%d)\ncalls=%d 0x%08x %d\n", t->index, t->index, totalCalls, _r.sub[i].dst, t->n->line );
-        fprintf( _r.c, "0x%08x %d %ld\n", _r.sub[i].src, f->n->line, totalCost );
+        fprintf( _r.c, "0x%08x %d %" PRId64 "\n", _r.sub[i].src, f->n->line, totalCost );
     }
 }
 // ====================================================================================================
@@ -476,7 +495,7 @@ void _outputProfile( void )
     fprintf( _r.c, "# callgrind format\n" );
     fprintf( _r.c, "positions: line instr\nevent: Cyc : Processor Clock Cycles\nevents: Cyc\n" );
     /* Samples are in time order, so we can determine the extent of time.... */
-    fprintf( _r.c, "summary: %ld\n", _r.calls[_r.cdCount - 1].tstamp - _r.calls[0].tstamp );
+    fprintf( _r.c, "summary: %" PRId64 "\n", _r.calls[_r.cdCount - 1].tstamp - _r.calls[0].tstamp );
     fprintf( _r.c, "ob=%s\n", options.elffile );
 
     /* If we have a set of sub-calls from a previous run then delete them */
@@ -1017,7 +1036,7 @@ int main( int argc, char *argv[] )
     ITMDecoderInit( &_r.i, options.forceITMSync );
 
     sockfd = socket( AF_INET, SOCK_STREAM, 0 );
-    setsockopt( sockfd, SOL_SOCKET, SO_REUSEPORT, &flag, sizeof( flag ) );
+    setsockopt( sockfd, SOL_SOCKET, SO_REUSEADDR, (void*)&flag, sizeof( flag ) );
 
     if ( sockfd < 0 )
     {
@@ -1026,7 +1045,7 @@ int main( int argc, char *argv[] )
     }
 
     /* Now open the network connection */
-    bzero( ( char * ) &serv_addr, sizeof( serv_addr ) );
+    memset( ( char * ) &serv_addr, 0, sizeof( serv_addr ) );
     server = gethostbyname( options.server );
 
     if ( !server )
@@ -1036,7 +1055,7 @@ int main( int argc, char *argv[] )
     }
 
     serv_addr.sin_family = AF_INET;
-    bcopy( ( char * )server->h_addr,
+    memcpy( ( char * )server->h_addr,
            ( char * )&serv_addr.sin_addr.s_addr,
            server->h_length );
     serv_addr.sin_port = htons( options.port );
