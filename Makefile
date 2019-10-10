@@ -29,7 +29,6 @@ GCC_DEFINE+= -std=gnu99
 
 CFILES =
 SFILES =
-OLOC = ofiles
 INCLUDE_PATHS = -I/usr/local/include/libusb-1.0 -I/usr/include/libiberty
 LDLIBS = -L/usr/local/lib -lusb-1.0  -lbfd -lz -liberty
 
@@ -52,7 +51,6 @@ DEBUG_OPTS = -g3 -gdwarf-2 -ggdb
 # Main Files
 # ==========
 App_DIR=Src
-INCLUDE_PATHS += -IInc -I$(OLOC)
 
 ORBUCULUM_CFILES = $(App_DIR)/$(ORBUCULUM).c $(App_DIR)/filewriter.c $(FPGA_CFILES)
 ORBCAT_CFILES = $(App_DIR)/$(ORBCAT).c 
@@ -85,8 +83,10 @@ SYS := $(shell $(CC) -dumpmachine)
 ifneq (, $(findstring linux, $(SYS)))
 LDLIBS += -lpthread  -ldl
 else ifneq (, $(findstring mingw, $(SYS)))
+OLOC = ofiles_mingw
 LDLIBS += -lws2_32
 endif
+OLOC ?= ofiles
 
 ##########################################################################
 # Quietening
@@ -102,6 +102,7 @@ endif
 
 HOST=-lc -lusb
 
+INCLUDE_PATHS += -IInc -I$(OLOC)
 ##########################################################################
 # Compiler settings, parameters and flags
 ##########################################################################
