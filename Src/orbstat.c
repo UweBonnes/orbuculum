@@ -1031,6 +1031,10 @@ int main( int argc, char *argv[] )
         exit( -3 );
     }
 
+#if defined(_WIN32) || defined(__CYGWIN__)
+    WSADATA wsaData;
+    WSAStartup(MAKEWORD(2, 2), &wsaData);
+#endif
     /* Reset the TPIU handler before we start */
     TPIUDecoderInit( &_r.t );
     ITMDecoderInit( &_r.i, options.forceITMSync );
