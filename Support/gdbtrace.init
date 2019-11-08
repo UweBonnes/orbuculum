@@ -168,37 +168,135 @@ end
 document enableIMXRT1021SWO
 enableIMXRT1021SWO Configure output pin on IMXRT1021 for SWO use.
 end
-# ====================================================================
 
-define enableSTM32SWO
-  set $tgt=1
-  if $argc >= 1
-    set $tgt = $arg0
+# ====================================================================
+define _GetStm32Idcode
+  set $CPUID = *0xE0042000 & 0xfff
+  if ($CPUID < 0x400 || $CPUID > 0x500)
+    set $CPUID = *0x5c001000 & 0xfff
+    if ($CPUID < 0x400 || $CPUID > 0x500)
+      set $CPUID = *0x5c001000 & 0xfff
+      if ($CPUID < 0x400 || $CPUID > 0x500)
+        set $CPUID = *0x40015800 & 0xfff
+          if ($CPUID < 0x400 || $CPUID > 0x500)
+            printf "Unexpected "
+          end
+       end
+    end
   end
-  set $CPU=$CPU_STM32
-  if ($tgt==4)
-    # STM32F4 variant.
-    # Enable AHB1ENR
-    set *0x40023830 |= 0x02
-    # Set MODER for PB3
-    set *0x40020400 &= ~(0x000000C0)
-    set *0x40020400 |= 0x00000080
-    # Set max (100MHz) speed in OSPEEDR
-    set *0x40020408 |= 0x000000C0
-    # No pull up or down in PUPDR
-    set *0x4002040C &= ~(0x000000C0)
-    # Set AF0 (==TRACESWO) in AFRL
-    set *0x40020420 &= ~(0x0000F000)
-  else
-    # STM32F1 variant.
+  printf "CPUID 0x%04x: ", $CPUID
+end
+
+# ====================================================================
+define _GetStm32Type
+  if ($CPUID == 0x410) || ($CPUID == 0x412) || ($CPUID == 0x414) || \
+     ($CPUID == 0x418) || ($CPUID == 0x420)
+    set $tgt=1
     # RCC->APB2ENR |= RCC_APB2ENR_AFIOEN;
     set *0x40021018 |= 1
     # AFIO->MAPR |= (2 << 24); // Disable JTAG to release TRACESWO
     set *0x40010004 |= 0x2000000
+    printf "STM32F1 type\n"
+  else
+    if ($CPUID == 0x411) || ($CPUID == 0x413) || ($CPUID == 0x419) || \
+       ($CPUID == 0x421) || ($CPUID == 0x423) || ($CPUID == 0x431) || \
+       ($CPUID == 0x433) || ($CPUID == 0x434) || ($CPUID == 0x441) || \
+       ($CPUID == 0x449) || ($CPUID == 0x451) || ($CPUID == 0x452) || \
+       ($CPUID == 0x458) || ($CPUID == 0x463)
+      set $tgt=4
+      # Enable AHB1ENR
+      set *0x40023830 |= 0x02
+      set $STM32_GPIOB = 0x40020400
+      printf "STM32F4 type\n"
+    else
+      if ($CPUID == 0x422)|| ($CPUID == 0x432) || ($CPUID == 0x438) || \
+         ($CPUID == 0x439)|| ($CPUID == 0x446)
+        set $tgt=3
+        # RCC->AHBENR |= RCC_AHBENR_IOPBEN;
+        set *0x40024014 |= 0x40000
+        set $STM32_GPIOB = 0x48000400
+        printf "STM32F3 type\n"
+      else
+        if ($CPUID == 0x416)|| ($CPUID == 0x427) || ($CPUID == 0x429) || \
+           ($CPUID == 0x436)|| ($CPUID == 0x437)
+          set $tgt=61
+          # RCC->AHBENR |= RCC_AHBENR_GPIOBEN;
+          set *0x4000381c |= 2
+          set $STM32_GPIOB = 0x40020400
+          printf "STM32L1 type\n"
+        else
+          if ($CPUID == 0x415) || ($CPUID == 0x435) || ($CPUID == 0x461) ||\
+             ($CPUID == 0x462) || ($CPUID == 0x464) || ($CPUID == 0x470)
+            set $tgt=64
+            # RCC->AHB2ENR |= RCC_AHB2ENR_IOPBEN;
+            set *0x4002104C |= 2
+            set $STM32_GPIOB = 0x48000400
+            printf "STM32L4 type\n"
+          else
+            if ($CPUID == 0x468) || ($CPUID == 0x449) || ($CPUID == 0x461)
+              set $tgt=14
+              # RCC->AHBENR |= RCC_AHBENR_IOPBEN;
+              set *0x4002101C |= 2
+              set $STM32_GPIOB = 0x48000400
+              printf "STM32G4 type\n"
+            else
+              if ($CPUID == 0x450)
+                set $tgt=27
+                # RCC->AHB4ENR |= RCC_AHB4ENR_GPIOBEN;
+                set *0x580244e0 |= 2
+                set $STM32_GPIOB = 0x58020400
+                printf "STM32H7 type\n"
+ #no SWO on Cortex-M0(+)
+             else
+                if ($CPUID == 0x440)|| ($CPUID == 0x442) || \
+                   ($CPUID == 0x444) || ($CPUID == 0x445)|| ($CPUID == 0x448)
+                  set $tgt=0
+                  printf "STM32F0 type\n"
+                else
+                  if ($CPUID == 0x417)|| ($CPUID == 0x425) ||
+                     ($CPUID == 0x447) || ($CPUID == 0x457)
+                    set $tgt=60
+                    printf "STM32L0 type\n"
+                  else
+                    if ($CPUID == 0x460)|| ($CPUID == 0x466)
+                      set $tgt=10
+                      printf "STM32G0 type\n"
+                    else
+                      printf "Unknown STM32\n"
+                    end
+                  end
+                end
+              end
+            end
+          end
+        end
+      end
+    end
   end
-  # Common initialisation.
-  # DBGMCU->CR |= DBGMCU_CR_TRACE_IOEN;
-  set *0xE0042004 |= 0x20
+end
+# ====================================================================
+
+define enableSTM32SWO
+  _GetStm32Idcode
+  _GetStm32Type
+  set $CPU=$CPU_STM32
+  if ($tgt!=1)
+    # Set MODER for PB3
+    set *$STM32_GPIOB &= ~(0x000000C0)
+    set *$STM32_GPIOB |= 0x00000080
+    # Set max (100MHz) speed in OSPEEDR
+    set *($STM32_GPIOB + 0x8) |= 0x000000C0
+    # No pull up or down in PUPDR
+    set *($STM32_GPIOB + 0xC) &= ~(0x000000C0)
+    # Set AF0 (==TRACESWO) in AFRL
+    set *($STM32_GPIOB + 0x20) &= ~(0x0000F000)
+  end
+  if ($tgt == 27)
+  else
+    # Common initialisation.
+    # DBGMCU->CR |= DBGMCU_CR_TRACE_IOEN;
+    set *0xE0042004 |= 0x20
+  end
 end
 document enableSTM32SWO
 enableSTM32SWO Configure output pin on STM32 for SWO use.
