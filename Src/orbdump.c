@@ -69,8 +69,10 @@ struct                                      /* Record for options, either defaul
     /* File to output dump to */
     char *outfile;
 
+#if !defined(__MINGW32__) &&  !defined(__CYGWIN__)
     /* Do we need to write syncronously */
     bool writeSync;
+#endif
 
     /* How long to dump */
     uint32_t timelen;
@@ -219,10 +221,11 @@ int _processOptions( int argc, char *argv[] )
                 options.forceITMSync = false;
                 break;
 
+#if !defined(__MINGW32__) &&  !defined(__CYGWIN__)
             case 'w':
                 options.writeSync = true;
                 break;
-
+#endif
             case 'v':
                 genericsSetReportLevel( atoi( optarg ) );
                 break;
@@ -285,7 +288,9 @@ int _processOptions( int argc, char *argv[] )
         genericsReport( V_INFO, "Rec Length: Unlimited" EOL );
     }
 
+#if !defined(__MINGW32__) &&  !defined(__CYGWIN__)
     genericsReport( V_INFO, "Sync Write: %s" EOL, options.writeSync ? "true" : "false" );
+#endif
 
     if ( options.useTPIU )
     {
@@ -410,10 +415,12 @@ int main( int argc, char *argv[] )
             genericsReport( V_WARN, "Warning:Sync lost while writing output" EOL );
         }
 
+#if !defined(__MINGW32__) &&  !defined(__CYGWIN__)
         if ( options.writeSync )
         {
             sync();
         }
+#endif
     }
 
     close( sockfd );
