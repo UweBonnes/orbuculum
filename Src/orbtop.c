@@ -620,7 +620,7 @@ static void _outputTop( uint32_t total, uint32_t reportLines, struct reportLine 
                     dispSamples += report[n].count;
                     totPercent += percentage;
 
-                    fprintf( stdout, "%3d.%02d%% %8ld ", percentage / 100, percentage % 100, report[n].count );
+                    fprintf( stdout, "%3d.%02d%% %8" PRId64 " ", percentage / 100, percentage % 100, report[n].count );
 
 
                     if ( ( options.reportFilenames ) && ( report[n].n->filename ) )
@@ -676,7 +676,7 @@ static void _outputTop( uint32_t total, uint32_t reportLines, struct reportLine 
 
     fprintf( stdout, "-----------------" EOL );
 
-    fprintf( stdout, "%3d.%02d%% %8ld of %ld Samples" EOL, totPercent / 100, totPercent % 100, dispSamples, samples );
+    fprintf( stdout, "%3d.%02d%% %8" PRId64 " of %" PRId64 " Samples" EOL, totPercent / 100, totPercent % 100, dispSamples, samples );
 
     if ( p )
     {
@@ -1188,11 +1188,8 @@ int main( int argc, char *argv[] )
             perror( "Error creating socket\n" );
             return -1;
         }
-
-        if ( setsockopt( sockfd, SOL_SOCKET, SO_REUSEADDR, &( int )
-    {
-        1
-    }, sizeof( int ) ) < 0 )
+        int flag_1 = 1;
+        if ( setsockopt( sockfd, SOL_SOCKET, SO_REUSEADDR, (void*)&flag_1, sizeof(flag_1) ) < 0 )
         {
             perror( "setsockopt(SO_REUSEADDR) failed" );
             return -1;
