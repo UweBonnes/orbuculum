@@ -49,15 +49,6 @@
 #include <inttypes.h>
 
 #include "bfd_wrapper.h"
-#if defined OSX
-    #include <libusb.h>
-#else
-    #if defined LINUX
-        #include <libusb-1.0/libusb.h>
-    #else
-        #error "Unknown OS"
-    #endif
-#endif
 #include <stdint.h>
 #include <limits.h>
 #include <termios.h>

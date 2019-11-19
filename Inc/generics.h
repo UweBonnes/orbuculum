@@ -37,7 +37,17 @@
 #include <limits.h>
 #include <stdint.h>
 
-#if defined LINUX
+#if defined(__APPLE__) && defined(__MACH__)
+    #include <libusb.h>
+#else
+    #include <libusb-1.0/libusb.h>
+#endif
+
+#if !defined(_POSIX_ARG_MAX)
+# define _POSIX_ARG_MAX 4096
+#endif
+
+#if defined(__linux__)
     #define EOL "\n"
 #else
     #define EOL "\n\r"

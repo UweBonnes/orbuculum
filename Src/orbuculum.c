@@ -43,13 +43,11 @@
 #include <string.h>
 #include <assert.h>
 #include <semaphore.h>
-#if defined OSX
+#if defined(__APPLE__) && defined(__MACH__)
     #include <sys/ioctl.h>
-    #include <libusb.h>
     #include <termios.h>
 #else
-    #if defined LINUX
-        #include <libusb-1.0/libusb.h>
+    #if defined(__linux__)
         #include <asm/ioctls.h>
         #if defined TCGETS2
             #include <asm/termios.h>
@@ -356,7 +354,7 @@ static void _intHandler( int sig, siginfo_t *si, void *unused )
     exit( 0 );
 }
 // ====================================================================================================
-#if defined(LINUX) && defined (TCGETS2)
+#if defined(__linux__) && defined (TCGETS2)
 static int _setSerialConfig ( int f, speed_t speed )
 {
     // Use Linux specific termios2.

@@ -43,12 +43,12 @@
 #include <string.h>
 #include <semaphore.h>
 #include <assert.h>
-#if defined OSX
+#if defined(__APPLE__) && defined(__MACH__)
     #include <sys/ioctl.h>
     #include <libusb.h>
     #include <termios.h>
 #else
-    #if defined LINUX
+    #if defined(__linux__)
         #include <libusb-1.0/libusb.h>
         #include <asm/ioctls.h>
         #if defined TCGETS2

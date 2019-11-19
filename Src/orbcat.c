@@ -43,15 +43,6 @@
 #include <sys/stat.h>
 #include <stdio.h>
 #include <string.h>
-#if defined OSX
-    #include <libusb.h>
-#else
-    #if defined LINUX
-        #include <libusb-1.0/libusb.h>
-    #else
-        #error "Unknown OS"
-    #endif
-#endif
 #include <stdint.h>
 #include <inttypes.h>
 #include <limits.h>

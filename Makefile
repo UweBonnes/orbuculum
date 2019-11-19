@@ -1,12 +1,17 @@
 # Optional components of the build
+ifneq (, $(findstring mingw, $(SYS)))
+WITH_FIFOS?=0
+WITH_FPGA?=0
+else
 WITH_FIFOS?=1
 WITH_FPGA?=1
+endif
 
 # Build configuration
 #VERBOSE=1
 #DEBUG=1
 
-CFLAGS=-DVERSION="\"1.10 InProgress\""
+CFLAGS=-DVERSION="\"1.10 InProgress\""  -Werror
 
 CROSS_COMPILE=
 # Output Files
@@ -16,20 +21,6 @@ ORBCAT = orbcat
 ORBTOP = orbtop
 ORBDUMP = orbdump
 ORBSTAT = orbstat
-
-##########################################################################
-# Check Host OS
-##########################################################################
-
-UNAME_S := $(shell uname -s)
-ifeq ($(UNAME_S),Linux)
-  CFLAGS += -DLINUX
-  LINUX=1
-endif
-ifeq ($(UNAME_S),Darwin)
-  CFLAGS += -DOSX
-  OSX=1
-endif
 
 ##########################################################################
 # User configuration and firmware specific object files	
@@ -63,11 +54,7 @@ CFILES =
 SFILES =
 OLOC = ofiles
 INCLUDE_PATHS += -I/usr/local/include/libusb-1.0 -I/usr/include/libiberty
-LDLIBS = -L. -L/usr/local/lib -lusb-1.0 -lelf -lbfd -lz -ldl -liberty -L$(OLOC) -l$(ORBLIB)
-
-ifdef LINUX
-LDLIBS += -lpthread
-endif
+LDLIBS = -L. -L/usr/local/lib -lusb-1.0 -lbfd -lz -liberty -L$(OLOC) -l$(ORBLIB)
 
 ##########################################################################
 # Generic multi-project files 
@@ -104,6 +91,7 @@ endif
 ##########################################################################
 
 ASTYLE = astyle
+ifneq ($(strip $(CROSS_COMPILE)),)
 AS = $(CROSS_COMPILE)gcc
 CC = $(CROSS_COMPILE)gcc
 LD = $(CROSS_COMPILE)gcc
@@ -111,8 +99,21 @@ AR = $(CROSS_COMPILE)ar
 GDB = $(CROSS_COMPILE)gdb
 OBJCOPY = $(CROSS_COMPILE)objcopy
 OBJDUMP = $(CROSS_COMPILE)objdump
+else
+LD = $(CC)
+endif
 GET_GIT_HASH = Tools/git_hash_to_c/git_hash_to_c.sh
-MAKE = make
+
+##########################################################################
+# Check Host OS
+##########################################################################
+
+SYS := $(shell $(CC) -dumpmachine)
+ifneq (, $(findstring linux, $(SYS)))
+LDLIBS += -lpthread -ldl
+else ifneq (, $(findstring mingw, $(SYS)))
+LDLIBS += -lws2_32
+endif
 
 ##########################################################################
 # Quietening
@@ -189,30 +190,30 @@ $(OLOC)/%.o : %.c
 	$(call cmd, \$(CC) -c $(CFLAGS) -MMD -o $@ $< ,\
 	Compiling $<)
 
-build: $(ORBUCULUM) $(ORBCAT) $(ORBTOP) $(ORBDUMP) $(ORBSTAT)
+build: $(ORBCAT) $(ORBTOP) $(ORBDUMP) $(ORBSTAT) $(ORBUCULUM)
 
 $(ORBLIB) : get_version $(ORBLIB_POBJS)
 	$(Q)$(AR) rcs $(OLOC)/lib$(ORBLIB).a  $(ORBLIB_POBJS)
 	-@echo "Completed build of" $(ORBLIB)
 
 $(ORBUCULUM) : $(ORBLIB) $(ORBUCULUM_POBJS) 
-	$(Q)$(LD) $(LDFLAGS) -o $(OLOC)/$(ORBUCULUM) $(MAP) $(ORBUCULUM_POBJS) $(LDLIBS)
+	$(Q)$(CC) $(LDFLAGS) -o $(OLOC)/$(ORBUCULUM) $(MAP) $(ORBUCULUM_POBJS) $(LDLIBS)
 	-@echo "Completed build of" $(ORBUCULUM)
 
 $(ORBCAT) : $(ORBLIB) $(ORBCAT_POBJS)
-	$(Q)$(LD) $(LDFLAGS) -o $(OLOC)/$(ORBCAT) $(MAP) $(ORBCAT_POBJS) $(LDLIBS)
+	$(Q)$(CC) $(LDFLAGS) -o $(OLOC)/$(ORBCAT) $(MAP) $(ORBCAT_POBJS) $(LDLIBS)
 	-@echo "Completed build of" $(ORBCAT)
 
 $(ORBTOP) : $(ORBLIB) $(ORBTOP_POBJS)
-	$(Q)$(LD) $(LDFLAGS) -o $(OLOC)/$(ORBTOP) $(MAP) $(ORBTOP_POBJS) $(LDLIBS)
+	$(Q)$(CC) $(LDFLAGS) -o $(OLOC)/$(ORBTOP) $(MAP) $(ORBTOP_POBJS) $(LDLIBS)
 	-@echo "Completed build of" $(ORBTOP)
 
 $(ORBDUMP) : $(ORBLIB) $(ORBDUMP_POBJS)
-	$(Q)$(LD) $(LDFLAGS) -o $(OLOC)/$(ORBDUMP) $(MAP) $(ORBDUMP_POBJS) $(LDLIBS)
+	$(Q)$(CC) $(LDFLAGS) -o $(OLOC)/$(ORBDUMP) $(MAP) $(ORBDUMP_POBJS) $(LDLIBS)
 	-@echo "Completed build of" $(ORBDUMP)
 
 $(ORBSTAT) : $(ORBLIB) $(ORBSTAT_POBJS)
-	$(Q)$(LD) $(LDFLAGS) -o $(OLOC)/$(ORBSTAT) $(MAP) $(ORBSTAT_POBJS) $(LDLIBS)
+	$(Q)$(CC) $(LDFLAGS) -o $(OLOC)/$(ORBSTAT) $(MAP) $(ORBSTAT_POBJS) $(LDLIBS)
 	-@echo "Completed build of" $(ORBSTAT)
 
 tags:
