@@ -301,7 +301,7 @@ static bool _makeServerTask( int port )
         return false;
     }
 
-    bzero( ( char * ) &serv_addr, sizeof( serv_addr ) );
+    memset( ( char * ) &serv_addr, 0, sizeof( serv_addr ) );
     serv_addr.sin_family = AF_INET;
     serv_addr.sin_addr.s_addr = INADDR_ANY;
     serv_addr.sin_port = htons( port );
@@ -541,7 +541,7 @@ int _processOptions( int argc, char *argv[] )
 #ifdef WITH_FIFOS
     char *chanConfig;
     char *chanName;
-    uint chan;
+    unsigned int chan;
     char *chanIndex;
 
     while ( ( c = getopt ( argc, argv, "a:b:c:f:hl:o:p:s:v:" ) ) != -1 )
@@ -903,7 +903,7 @@ int seggerFeeder( void )
     ssize_t t;
     int flag = 1;
 
-    bzero( ( char * ) &serv_addr, sizeof( serv_addr ) );
+    memset( ( char * ) &serv_addr, 0, sizeof( serv_addr ) );
     server = gethostbyname( options.seggerHost );
 
     if ( !server )
@@ -913,7 +913,7 @@ int seggerFeeder( void )
     }
 
     serv_addr.sin_family = AF_INET;
-    bcopy( ( char * )server->h_addr,
+    memcpy( ( char * )server->h_addr,
            ( char * )&serv_addr.sin_addr.s_addr,
            server->h_length );
     serv_addr.sin_port = htons( options.seggerPort );
