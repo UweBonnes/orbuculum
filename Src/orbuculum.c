@@ -36,39 +36,17 @@
 #include <fcntl.h>
 #include <stdbool.h>
 #include <ctype.h>
-#include <sys/socket.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <sys/time.h>
 #include <stdio.h>
 #include <string.h>
 #include <assert.h>
 #include <semaphore.h>
-#if defined(__APPLE__) && defined(__MACH__)
-    #include <sys/ioctl.h>
-    #include <termios.h>
-#else
-    #if defined(__linux__)
-        #include <asm/ioctls.h>
-        #if defined TCGETS2
-            #include <asm/termios.h>
-            /* Manual declaration to avoid conflict. */
-            extern int ioctl ( int __fd, unsigned long int __request, ... ) __THROW;
-        #else
-            #include <sys/ioctl.h>
-            #include <termios.h>
-        #endif
-    #else
-        #error "Unknown OS"
-    #endif
-#endif
 #include <stdint.h>
 #include <inttypes.h>
 #include <limits.h>
 #include <pthread.h>
-#include <sys/socket.h>
-#include <netdb.h>
-#include <netinet/in.h>
-#include <arpa/inet.h>
 #include <signal.h>
 
 #include "git_version_info.h"
@@ -77,7 +55,6 @@
 #include "fifos.h"
 
 #ifdef INCLUDE_FPGA_SUPPORT
-    #include <libftdi1/ftdi.h>
     #include "ftdispi.h"
     #define FTDI_VID  (0x0403)
     #define FTDI_PID  (0x6010)
@@ -293,7 +270,7 @@ static bool _makeServerTask( int port )
     int flag = 1;
 
     sockfd = socket( AF_INET, SOCK_STREAM, 0 );
-    setsockopt( sockfd, SOL_SOCKET, SO_REUSEPORT, &flag, sizeof( flag ) );
+    setsockopt( sockfd, SOL_SOCKET,  SO_REUSEADDR, (void*)&flag, sizeof( flag ) );
 
     if ( sockfd < 0 )
     {
@@ -921,7 +898,7 @@ int seggerFeeder( void )
     while ( 1 )
     {
         sockfd = socket( AF_INET, SOCK_STREAM, 0 );
-        setsockopt( sockfd, SOL_SOCKET, SO_REUSEPORT, &flag, sizeof( flag ) );
+        setsockopt( sockfd, SOL_SOCKET,  SO_REUSEADDR, (void*)&flag, sizeof( flag ) );
 
         if ( sockfd < 0 )
         {
@@ -1236,12 +1213,12 @@ int main( int argc, char *argv[] )
         genericsExit( -1, "Failed to make network server" EOL );
     }
 
+#ifdef INCLUDE_FPGA_SUPPORT
+
     /* Start the filewriter */
     filewriterInit( options.fwbasedir );
 
     /* Using the exit construct rather than return ensures any atexit gets called */
-
-#ifdef INCLUDE_FPGA_SUPPORT
 
     if ( options.orbtrace )
     {

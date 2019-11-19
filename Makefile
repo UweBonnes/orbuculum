@@ -1,12 +1,3 @@
-# Optional components of the build
-ifneq (, $(findstring mingw, $(SYS)))
-WITH_FIFOS?=0
-WITH_FPGA?=0
-else
-WITH_FIFOS?=1
-WITH_FPGA?=1
-endif
-
 # Build configuration
 #VERBOSE=1
 #DEBUG=1
@@ -37,10 +28,6 @@ DEBUG_OPTS =
 OPT_LEVEL = -O2
 endif
 
-ifeq ($(WITH_FIFOS),1)
-CFLAGS += -DWITH_FIFOS
-endif
-
 # Directories for sources
 App_DIR=Src
 Inc_DIR=Inc
@@ -53,8 +40,7 @@ GCC_DEFINE+= -std=gnu99
 CFILES =
 SFILES =
 OLOC = ofiles
-INCLUDE_PATHS += -I/usr/local/include/libusb-1.0 -I/usr/include/libiberty
-LDLIBS = -L. -L/usr/local/lib -lusb-1.0 -lbfd -lz -liberty -L$(OLOC) -l$(ORBLIB)
+LDLIBS = -L. -lusb-1.0 -lbfd -lz -liberty -L$(OLOC) -l$(ORBLIB)
 
 ##########################################################################
 # Generic multi-project files 
@@ -69,9 +55,6 @@ LDLIBS = -L. -L/usr/local/lib -lusb-1.0 -lbfd -lz -liberty -L$(OLOC) -l$(ORBLIB)
 
 ORBLIB_CFILES = $(App_DIR)/itmDecoder.c $(App_DIR)/tpiuDecoder.c $(App_DIR)/itmSeq.c
 ORBUCULUM_CFILES = $(App_DIR)/$(ORBUCULUM).c $(App_DIR)/filewriter.c $(FPGA_CFILES)
-ifeq ($(WITH_FIFOS),1)
-ORBUCULUM_CFILES += $(App_DIR)/fifos.c
-endif
 ORBCAT_CFILES = $(App_DIR)/$(ORBCAT).c 
 ORBTOP_CFILES = $(App_DIR)/$(ORBTOP).c $(App_DIR)/symbols.c $(EXT)/cJSON.c
 ORBDUMP_CFILES = $(App_DIR)/$(ORBDUMP).c
@@ -112,7 +95,22 @@ SYS := $(shell $(CC) -dumpmachine)
 ifneq (, $(findstring linux, $(SYS)))
 LDLIBS += -lpthread -ldl
 else ifneq (, $(findstring mingw, $(SYS)))
+CFLAGS += -D_WIN32_WINNT=0x600
 LDLIBS += -lws2_32
+endif
+
+# Optional components of the build
+ifneq (, $(findstring mingw, $(SYS)))
+WITH_FIFOS?=0
+WITH_FPGA?=0
+else
+WITH_FIFOS?=1
+WITH_FPGA?=1
+endif
+
+ifeq ($(WITH_FIFOS),1)
+CFLAGS += -DWITH_FIFOS
+ORBUCULUM_CFILES += $(App_DIR)/fifos.c
 endif
 
 ##########################################################################
@@ -190,7 +188,7 @@ $(OLOC)/%.o : %.c
 	$(call cmd, \$(CC) -c $(CFLAGS) -MMD -o $@ $< ,\
 	Compiling $<)
 
-build: $(ORBCAT) $(ORBTOP) $(ORBDUMP) $(ORBSTAT) $(ORBUCULUM)
+build: $(ORBCAT) $(ORBDUMP) $(ORBTOP) $(ORBSTAT) $(ORBUCULUM)
 
 $(ORBLIB) : get_version $(ORBLIB_POBJS)
 	$(Q)$(AR) rcs $(OLOC)/lib$(ORBLIB).a  $(ORBLIB_POBJS)

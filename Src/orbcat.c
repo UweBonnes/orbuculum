@@ -37,20 +37,14 @@
 #include <unistd.h>
 #include <fcntl.h>
 #include <ctype.h>
-#include <sys/socket.h>
 #include <sys/types.h>
-#include <sys/ioctl.h>
 #include <sys/stat.h>
 #include <stdio.h>
 #include <string.h>
 #include <stdint.h>
 #include <inttypes.h>
 #include <limits.h>
-#include <termios.h>
 #include <pthread.h>
-#include <sys/socket.h>
-#include <netinet/in.h>
-#include <netdb.h>
 
 #include "git_version_info.h"
 #include "generics.h"
@@ -591,7 +585,7 @@ int main( int argc, char *argv[] )
     ITMDecoderInit( &_r.i, options.forceITMSync );
 
     sockfd = socket( AF_INET, SOCK_STREAM, 0 );
-    setsockopt( sockfd, SOL_SOCKET, SO_REUSEPORT, &flag, sizeof( flag ) );
+    setsockopt( sockfd, SOL_SOCKET,  SO_REUSEADDR, (void*)&flag, sizeof( flag ) );
 
     if ( sockfd < 0 )
     {

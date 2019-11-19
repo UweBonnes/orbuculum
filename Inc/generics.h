@@ -37,10 +37,34 @@
 #include <limits.h>
 #include <stdint.h>
 
+#if defined(_WIN32) || defined(__CYGWIN__)
+#   include <winsock2.h>
+#   include <windows.h>
+#   include <ws2tcpip.h>
+#   include <libiberty/demangle.h>
+#   include <libusb-1.0/libusb.h>
+#else
+#   include <sys/socket.h>
+#   include <netinet/in.h>
+#   include <netdb.h>
+#   include <demangle.h>
+#   include <arpa/inet.h>
+#endif
+
 #if defined(__APPLE__) && defined(__MACH__)
+    #include <sys/ioctl.h>
+    #include <termios.h>
     #include <libusb.h>
 #else
-    #include <libusb-1.0/libusb.h>
+     #if defined(__linux__)
+         #include <libusb-1.0/libusb.h>
+         #include <asm/ioctls.h>
+         #if defined TCGETS2
+             #include <asm/termios.h>
+             /* Manual declaration to avoid conflict. */
+             extern int ioctl ( int __fd, unsigned long int __request, ... ) __THROW;
+         #endif
+     #endif
 #endif
 
 #if !defined(_POSIX_ARG_MAX)

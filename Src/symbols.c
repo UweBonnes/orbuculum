@@ -38,12 +38,10 @@
 #include <fcntl.h>
 #include <ctype.h>
 #include <sys/types.h>
-#include <sys/ioctl.h>
 #include <sys/stat.h>
 #include <stdio.h>
 #include <string.h>
 #include <stdarg.h>
-#include <elf.h>
 #include <stdint.h>
 #include <assert.h>
 #include "generics.h"
