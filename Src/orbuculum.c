@@ -76,7 +76,7 @@
 /* Descriptor information for BMP */
 #define VID       (0x1d50)
 #define PID       (0x6018)
-#define INTERFACE (5)
+#define SWO_INTERFACE (5)
 #define ENDPOINT  (0x85)
 
 #define TRANSFER_SIZE (4096)
@@ -283,10 +283,7 @@ static bool _makeServerTask( int port )
     serv_addr.sin_addr.s_addr = INADDR_ANY;
     serv_addr.sin_port = htons( port );
 
-    if ( setsockopt( sockfd, SOL_SOCKET, SO_REUSEADDR, &( int )
-{
-    1
-}, sizeof( int ) ) < 0 )
+    if ( setsockopt( sockfd, SOL_SOCKET, SO_REUSEADDR, (void*)&flag, sizeof( flag ) ) < 0 )
     {
         genericsReport( V_ERROR, "setsockopt(SO_REUSEADDR) failed" );
         return false;
@@ -324,14 +321,24 @@ static void _sendToClients( uint32_t len, uint8_t *buffer )
     sem_post( &_r.clientList );
 }
 // ====================================================================================================
+#if defined(__MINGW32__) || defined(__CYGWIN__)
+#else
 static void _intHandler( int sig, siginfo_t *si, void *unused )
 
 {
     /* CTRL-C exit is not an error... */
     exit( 0 );
 }
+#endif
 // ====================================================================================================
-#if defined(__linux__) && defined (TCGETS2)
+#if defined(__MINGW32__) || defined(__CYGWIN__)
+static int _setSerialConfig ( int f, int speed )
+{
+    (void) f;
+    (void) speed;
+    return 0;
+}
+#elif defined(__linux__) && defined (TCGETS2)
 static int _setSerialConfig ( int f, speed_t speed )
 {
     // Use Linux specific termios2.
@@ -839,7 +846,7 @@ int usbFeeder( void )
             continue;
         }
 
-        if ( ( err = libusb_claim_interface ( handle, INTERFACE ) ) < 0 )
+        if ( ( err = libusb_claim_interface ( handle, SWO_INTERFACE ) ) < 0 )
         {
             genericsReport( V_ERROR, "Failed to claim interface (%d)" EOL, err );
             return 0;
@@ -1145,26 +1152,26 @@ int fileFeeder( void )
     return true;
 }
 // ====================================================================================================
+#ifdef WITH_FIFOS
 static void _doExit( void )
 
 {
-#ifdef WITH_FIFOS
 
     if ( _r.f )
     {
         fifoRemove( _r.f );
     }
 
-#endif
 }
+#endif
 // ====================================================================================================
 int main( int argc, char *argv[] )
 
 {
+#ifdef WITH_FIFOS
     sigset_t set;
     struct sigaction sa;
 
-#ifdef WITH_FIFOS
     _r.f = fifoInit( );
     assert( _r.f );
 #endif
@@ -1175,6 +1182,7 @@ int main( int argc, char *argv[] )
         genericsExit( -1, "" EOL );
     }
 
+#ifdef WITH_FIFOS
     /* Make sure the fifos get removed at the end */
     atexit( _doExit );
 
@@ -1199,7 +1207,6 @@ int main( int argc, char *argv[] )
         genericsExit( -1, "Failed to establish Int handler" EOL );
     }
 
-#ifdef WITH_FIFOS
 
     if ( ! ( fifoCreate( _r.f ) ) )
     {
